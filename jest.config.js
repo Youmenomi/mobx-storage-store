@@ -7,5 +7,5 @@ module.exports = {
     '^.+\\.jsx?$': 'babel-jest',
   },
   collectCoverage: true,
-  collectCoverageFrom: ['<rootDir>/src/**/*.ts'],
+  collectCoverageFrom: ['<rootDir>/src/**/*.js'],
 }

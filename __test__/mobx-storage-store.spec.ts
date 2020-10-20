@@ -1,5 +1,3 @@
-import { autorun, IReactionDisposer } from 'mobx';
-
 import { MobxStorageStore, DriverInterface } from '../src';
 import {
   getSaved,
@@ -10,6 +8,7 @@ import {
   restoreSaved,
   defLen,
 } from './helper';
+import { autorun, configure } from 'mobx';
 
 describe('mobx-storage-store', () => {
   jest
@@ -22,136 +21,230 @@ describe('mobx-storage-store', () => {
     .mockImplementation((name: string, value: string) => {
       setSaved(name, value);
     });
-  oneSetTest('default sync', new MobxStorageStore(defaults));
 
-  oneSetTest(
-    'cunstom async',
-    new MobxStorageStore(defaults, () => new AsyncDriver()),
-    true
-  );
-});
+  runTest('sync driver', new MobxStorageStore(defaults));
 
-function oneSetTest<TDriver extends DriverInterface = Storage>(
-  testName: string | number | Function | jest.FunctionLike,
-  mobxStorageStore: MobxStorageStore<typeof defaults, StorageName, TDriver>,
-  handleDispose = false
-) {
-  describe(testName, () => {
-    restoreSaved();
+  runTest('async driver', new MobxStorageStore(defaults, new AsyncDriver()));
 
-    let view: jest.Mock<string>;
-    let dispose: IReactionDisposer;
-    beforeAll(() => {
+  describe('mobx', () => {
+    configure({
+      enforceActions: 'always',
+      computedRequiresReaction: true,
+      reactionRequiresObservable: true,
+      // observableRequiresReaction: true,
+      // disableErrorBoundaries: true,
+    });
+
+    let storage: MobxStorageStore<
+      {
+        user: string;
+        no: number;
+        enable: boolean;
+        data: {};
+      },
+      StorageName,
+      AsyncDriver
+    >;
+    let view: jest.Mock;
+
+    beforeEach(async () => {
+      restoreSaved();
+
+      storage = new MobxStorageStore(defaults, new AsyncDriver());
+      await storage.initialize();
+
       view = jest.fn(() => {
         try {
-          return mobxStorageStore.getItem(StorageName.user);
+          return `user:${storage.getItem(
+            StorageName.user
+          )},no:${storage.getItem(StorageName.no)},enable:${storage.getItem(
+            StorageName.enable
+          )},data:${storage.getItem(StorageName.data)},`;
         } catch (error) {
           return error;
         }
       });
-      dispose = autorun(view);
-    });
-    afterAll(() => {
-      dispose();
-    });
 
-    it('test init', async () => {
-      expect(view).lastReturnedWith(
-        new RangeError(
-          'The key parameter is an invalid value. May be disposed or uninitialized.'
-        )
-      );
-      await mobxStorageStore.init();
-      expect(mobxStorageStore.defaults).toEqual(defaults);
-      expect(view).lastReturnedWith(getSaved(StorageName.user));
-    });
-
-    it('test length', async () => {
-      expect(await mobxStorageStore.length).toBe(defLen);
-    });
-
-    it('test hasItem', () => {
-      expect(mobxStorageStore.hasItem(StorageName.user)).toBeTruthy();
-      expect(mobxStorageStore.hasItem('other' as any)).toBeFalsy();
-    });
-
-    it('test getItem', () => {
-      expect(mobxStorageStore.getItem(StorageName.user)).toBe(
-        getSaved(StorageName.user)
-      );
-      expect(mobxStorageStore.getItem(StorageName.no)).toBe(
-        getSaved(StorageName.no)
-      );
-      expect(mobxStorageStore.getItem(StorageName.enable)).toBe(
-        defaults[StorageName.enable]
-      );
-      expect(mobxStorageStore.getItem(StorageName.data)).toEqual(
-        getSaved(StorageName.data)
-      );
-
-      expect(() => mobxStorageStore.getItem('other' as any)).toThrowError(
-        RangeError
-      );
+      autorun(view);
+      view.mockClear();
     });
 
     it('test setItem', async () => {
       const user = 'test001';
-      await mobxStorageStore.setItem(StorageName.user, user);
-      expect(mobxStorageStore.getItem(StorageName.user)).toBe(user);
-      expect(view).lastReturnedWith(user);
+      await storage.setItem(StorageName.user, user);
+      expect(view).toBeCalledTimes(1);
+      expect(view).lastReturnedWith(
+        `user:${user},no:${123},enable:${defaults[StorageName.enable]},data:${{
+          name: 'John',
+          age: 12,
+        }},`
+      );
 
-      await mobxStorageStore.setItem(StorageName.user, undefined as any);
-      expect(mobxStorageStore.getItem(StorageName.user)).toBeUndefined();
-      await mobxStorageStore.setItem(StorageName.user, null as any);
-      expect(mobxStorageStore.getItem(StorageName.user)).toBe(
+      await storage.setItem(StorageName.user, undefined as any);
+      expect(view).toBeCalledTimes(2);
+      expect(view).lastReturnedWith(
+        `user:${undefined},no:${123},enable:${
+          defaults[StorageName.enable]
+        },data:${{
+          name: 'John',
+          age: 12,
+        }},`
+      );
+
+      await storage.setItem(StorageName.user, null as any);
+      expect(view).toBeCalledTimes(3);
+      expect(view).lastReturnedWith(
+        `user:${defaults[StorageName.user]},no:${123},enable:${
+          defaults[StorageName.enable]
+        },data:${{
+          name: 'John',
+          age: 12,
+        }},`
+      );
+
+      await expect(
+        storage.setItem('other' as any, null as any)
+      ).rejects.toThrowError(RangeError);
+      expect(view).toBeCalledTimes(3);
+    });
+
+    it('test resetItem', async () => {
+      await storage.resetItem(StorageName.no);
+      expect(view).toBeCalledTimes(1);
+      expect(view).lastReturnedWith(
+        `user:${'user001'},no:${defaults[StorageName.no]},enable:${
+          defaults[StorageName.enable]
+        },data:${{
+          name: 'John',
+          age: 12,
+        }},`
+      );
+
+      await expect(storage.resetItem('other' as any)).rejects.toThrowError(
+        RangeError
+      );
+      expect(view).toBeCalledTimes(1);
+    });
+
+    it('test resetAll', async () => {
+      await storage.resetAll();
+      expect(view).toBeCalledTimes(1);
+      expect(view).lastReturnedWith(
+        `user:${defaults[StorageName.user]},no:${
+          defaults[StorageName.no]
+        },enable:${defaults[StorageName.enable]},data:${
+          defaults[StorageName.data]
+        },`
+      );
+    });
+
+    it('test dispose', async () => {
+      await storage.dispose();
+      expect(view).lastReturnedWith(
+        new Error(
+          '[strict-async-storage] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+        )
+      );
+    });
+  });
+});
+
+function runTest<TDriver extends DriverInterface = Storage>(
+  testName: string | number | Function | jest.FunctionLike,
+  storage: MobxStorageStore<typeof defaults, StorageName, TDriver>
+) {
+  describe(testName, () => {
+    restoreSaved();
+
+    it('test initialize', async () => {
+      expect(storage.initialized).toBeFalsy();
+      await storage.initialize();
+      expect(storage.initialized).toBeTruthy();
+      expect(storage.defaults).toEqual(defaults);
+
+      await expect(async () => await storage.initialize()).rejects.toThrowError(
+        '[strict-async-storage] Invalid operation. This has been initialized.'
+      );
+    });
+
+    it('test length', async () => {
+      expect(await storage.length).toBe(defLen);
+    });
+
+    it('test getItem', () => {
+      expect(storage.getItem(StorageName.user)).toBe(
+        getSaved(StorageName.user)
+      );
+      expect(storage.getItem(StorageName.no)).toBe(getSaved(StorageName.no));
+      expect(storage.getItem(StorageName.enable)).toBe(
+        defaults[StorageName.enable]
+      );
+      expect(storage.getItem(StorageName.data)).toEqual(
+        getSaved(StorageName.data)
+      );
+
+      expect(() => storage.getItem('other' as any)).toThrowError(RangeError);
+    });
+
+    it('test setItem', async () => {
+      const user = 'test001';
+      await storage.setItem(StorageName.user, user);
+      expect(storage.getItem(StorageName.user)).toBe(user);
+
+      await storage.setItem(StorageName.user, undefined as any);
+      expect(storage.getItem(StorageName.user)).toBeUndefined();
+      await storage.setItem(StorageName.user, null as any);
+      expect(storage.getItem(StorageName.user)).toBe(
         defaults[StorageName.user]
       );
 
       await expect(
-        mobxStorageStore.setItem('other' as any, null as any)
+        storage.setItem('other' as any, null as any)
       ).rejects.toThrowError(RangeError);
     });
 
     it('test resetItem', async () => {
-      expect(await mobxStorageStore.resetItem(StorageName.user)).toBe(
+      expect(await storage.resetItem(StorageName.user)).toBe(
         defaults[StorageName.user]
       );
-      expect(mobxStorageStore.getItem(StorageName.user)).toBe(
+      expect(storage.getItem(StorageName.user)).toBe(
         defaults[StorageName.user]
       );
-      expect(view).lastReturnedWith(defaults[StorageName.user]);
 
-      await expect(
-        mobxStorageStore.resetItem('other' as any)
-      ).rejects.toThrowError(RangeError);
+      await expect(storage.resetItem('other' as any)).rejects.toThrowError(
+        RangeError
+      );
     });
 
     it('test resetAll', async () => {
-      await mobxStorageStore.resetAll();
+      await storage.resetAll();
 
-      expect(mobxStorageStore.getItem(StorageName.user)).toBe(
+      expect(storage.getItem(StorageName.user)).toBe(
         defaults[StorageName.user]
       );
-      expect(mobxStorageStore.getItem(StorageName.no)).toBe(
-        defaults[StorageName.no]
-      );
-      expect(mobxStorageStore.getItem(StorageName.enable)).toBe(
+      expect(storage.getItem(StorageName.no)).toBe(defaults[StorageName.no]);
+      expect(storage.getItem(StorageName.enable)).toBe(
         defaults[StorageName.enable]
       );
-      expect(mobxStorageStore.getItem(StorageName.data)).toEqual(
+      expect(storage.getItem(StorageName.data)).toEqual(
         defaults[StorageName.data]
       );
     });
 
     it('test dispose', () => {
-      if (handleDispose) {
-        const handler = jest.fn();
-        mobxStorageStore.dispose(handler);
-        expect(handler).toBeCalled();
-      } else {
-        mobxStorageStore.dispose();
-        expect(mobxStorageStore.length).toBe(0);
-      }
+      expect(storage.disposed).toBeFalsy();
+      storage.dispose();
+      expect(storage.disposed).toBeTruthy();
+      expect(() => storage.dispose()).toThrowError(
+        '[strict-async-storage] Invalid operation. This has been disposed.'
+      );
+
+      expect(() => storage.length).toThrowError(
+        '[strict-async-storage] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+      );
+      expect(() => storage.getItem(StorageName.user)).toThrowError(
+        '[strict-async-storage] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+      );
     });
   });
 }

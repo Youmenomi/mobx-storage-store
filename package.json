@@ -3,26 +3,26 @@
   "version": "0.0.1",
   "description": "",
   "keywords": [
-    "typescript",
     "mobx",
-    "store",
-    "strict",
-    "async",
-    "storage",
-    "localStorage",
-    "switchable"
+    "typescript",
+    "intl",
+    "Localization",
+    "globalization",
+    "translation",
+    "multi-language",
+    "remote"
   ],
   "main": "dist/cjs/mobx-storage-store.cjs.js",
   "module": "dist/esm/mobx-storage-store.esm.js",
-  "types": "dist/types/index.d.ts",
+  "types": "src/index.d.ts",
   "files": [
     "dist"
   ],
   "scripts": {
     "test": "jest",
     "build:js": "rollup -c",
-    "build:types": "tsc --emitDeclarationOnly -p tsconfig.build.json",
-    "build": "tsc --noEmit && eslint --ext .ts,.js ./src && npm run build:js && npm run build:types",
+    "build:clean": "del dist",
+    "build": "eslint --ext .ts,.js ./src && npm run build:clean && npm run build:js",
     "release": "np",
     "version": "npm run build"
   },
@@ -49,36 +49,34 @@
   },
   "homepage": "https://github.com/Youmenomi/mobx-storage-store#readme",
   "devDependencies": {
-    "@babel/plugin-proposal-class-properties": "^7.10.4",
-    "@babel/plugin-proposal-decorators": "^7.10.4",
-    "@babel/preset-env": "^7.10.4",
-    "@babel/preset-typescript": "^7.10.4",
-    "@rollup/plugin-babel": "^5.0.4",
-    "@rollup/plugin-commonjs": "^13.0.0",
-    "@rollup/plugin-json": "^4.1.0",
-    "@rollup/plugin-node-resolve": "^8.1.0",
-    "@types/async": "^3.2.3",
-    "@types/jest": "^26.0.3",
-    "@typescript-eslint/eslint-plugin": "^3.9.1",
-    "@typescript-eslint/parser": "^3.9.1",
+    "@babel/plugin-proposal-class-properties": "^7.12.1",
+    "@babel/plugin-proposal-decorators": "^7.12.1",
+    "@babel/preset-env": "^7.12.1",
+    "@babel/preset-typescript": "^7.12.1",
+    "@types/jest": "^26.0.15",
+    "@typescript-eslint/eslint-plugin": "^4.5.0",
+    "@typescript-eslint/parser": "^4.5.0",
     "babel-eslint": "^10.1.0",
-    "babel-jest": "^26.1.0",
-    "eslint": "^7.7.0",
-    "eslint-config-prettier": "^6.11.0",
+    "babel-jest": "^26.6.0",
+    "del-cli": "^3.0.1",
+    "eslint": "^7.11.0",
+    "eslint-config-prettier": "^6.13.0",
     "eslint-plugin-prettier": "^3.1.4",
-    "husky": "^4.2.5",
-    "jest": "^26.1.0",
-    "lint-staged": "^10.2.11",
-    "np": "^6.3.1",
-    "prettier": "^2.0.5",
-    "rollup": "^2.21.0",
-    "rollup-plugin-filesize": "^9.0.2",
-    "rollup-plugin-terser": "^6.1.0",
-    "ts-jest": "^26.1.1",
-    "typescript": "^3.9.6"
+    "husky": "^4.3.0",
+    "jest": "^26.6.0",
+    "lint-staged": "^10.4.2",
+    "mobx": "^6.0.1",
+    "np": "^6.5.0",
+    "prettier": "^2.1.2",
+    "rollup": "^2.32.0",
+    "rollup-simple-configer": "^0.1.1",
+    "ts-jest": "^26.4.1",
+    "typescript": "^4.0.3"
   },
   "dependencies": {
-    "mobx": "^5.15.6",
-    "strict-async-storage": "0.0.3"
+    "strict-async-storage": "^0.1.1"
+  },
+  "peerDependencies": {
+    "mobx": "^6.0.1"
   }
 }
